@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { UserRole } from '@/lib/types/database'
@@ -14,18 +14,29 @@ export default function SignupPage() {
   const [step, setStep] = useState<'form' | 'otp'>('form')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
 
   const supabase = createClient()
 
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+  const startCooldown = useCallback(() => {
+    setResendCooldown(60)
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [])
 
+  const sendOtp = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         shouldCreateUser: true,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: {
           name,
           role,
@@ -35,9 +46,39 @@ export default function SignupPage() {
     })
 
     if (error) {
-      setError('登録に失敗しました。既に登録済みのメールアドレスの可能性があります。')
-    } else {
+      console.error('OTP send error:', error.message, error.status)
+      if (error.status === 429) {
+        setError('送信回数の制限に達しました。しばらく待ってから再度お試しください。')
+      } else {
+        setError('登録に失敗しました。既に登録済みのメールアドレスの可能性があります。')
+      }
+      return false
+    }
+    return true
+  }, [email, name, role, companyName, supabase.auth])
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    const success = await sendOtp()
+    if (success) {
       setStep('otp')
+      startCooldown()
+    }
+    setLoading(false)
+  }
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return
+    setLoading(true)
+    setError('')
+
+    const success = await sendOtp()
+    if (success) {
+      startCooldown()
+      setError('')
     }
     setLoading(false)
   }
@@ -54,6 +95,7 @@ export default function SignupPage() {
     })
 
     if (verifyError) {
+      console.error('OTP verify error:', verifyError.message, verifyError.status)
       setError('認証コードが正しくありません。')
       setLoading(false)
       return
@@ -205,6 +247,9 @@ export default function SignupPage() {
               <p className="text-sm text-gray-600 mb-4">
                 <span className="font-medium">{email}</span> に認証コードを送信しました。
               </p>
+              <p className="text-xs text-gray-400 mb-4">
+                メールが届かない場合は、迷惑メールフォルダもご確認ください。
+              </p>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   認証コード
@@ -228,8 +273,18 @@ export default function SignupPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setStep('form'); setOtp(''); setError('') }}
+                onClick={handleResendOtp}
+                disabled={loading || resendCooldown > 0}
                 className="btn-secondary w-full mt-2"
+              >
+                {resendCooldown > 0
+                  ? `認証コードを再送信（${resendCooldown}秒）`
+                  : '認証コードを再送信'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStep('form'); setOtp(''); setError('') }}
+                className="text-sm text-gray-500 hover:text-gray-700 w-full mt-2"
               >
                 戻る
               </button>
