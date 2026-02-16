@@ -36,7 +36,6 @@ export default function SignupPage() {
       email,
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: {
           name,
           role,
