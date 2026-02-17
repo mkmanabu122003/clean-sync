@@ -221,32 +221,32 @@ export default function SignupPage() {
           {step === 'otp' && (
             <form onSubmit={handleVerifyOtp}>
               <p className="text-sm text-gray-600 mb-4">
-                <span className="font-medium">{email}</span> に6桁の認証コードを送信しました。
+                <span className="font-medium">{email}</span> に認証コードを送信しました。
               </p>
               <p className="text-xs text-gray-400 mb-4">
                 メールが届かない場合は、迷惑メールフォルダもご確認ください。
               </p>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  認証コード（6桁）
+                  認証コード
                 </label>
                 <input
                   type="text"
                   value={otp}
                   onChange={(e) => {
                     const v = e.target.value.replace(/[^0-9]/g, '')
-                    if (v.length <= 6) setOtp(v)
+                    if (v.length <= 8) setOtp(v)
                   }}
                   className="input-field text-center text-2xl tracking-widest"
-                  placeholder="000000"
+                  placeholder="00000000"
                   inputMode="numeric"
-                  maxLength={6}
+                  maxLength={8}
                   required
                 />
               </div>
               <button
                 type="submit"
-                disabled={loading || otp.length !== 6}
+                disabled={loading || otp.length < 6}
                 className="btn-primary w-full"
               >
                 {loading ? '確認中...' : '認証する'}
