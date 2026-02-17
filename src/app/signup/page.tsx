@@ -7,6 +7,7 @@ import { UserRole } from '@/lib/types/database'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [role, setRole] = useState<UserRole>('owner')
   const [companyName, setCompanyName] = useState('')
@@ -31,11 +32,15 @@ export default function SignupPage() {
     }, 1000)
   }, [])
 
-  const sendOtp = useCallback(async () => {
-    const { error } = await supabase.auth.signInWithOtp({
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    const { error } = await supabase.auth.signUp({
       email,
+      password,
       options: {
-        shouldCreateUser: true,
         data: {
           name,
           role,
@@ -45,24 +50,13 @@ export default function SignupPage() {
     })
 
     if (error) {
-      console.error('OTP send error:', error.message, error.status)
+      console.error('Signup error:', error.message, error.status)
       if (error.status === 429) {
         setError('送信回数の制限に達しました。しばらく待ってから再度お試しください。')
       } else {
         setError('登録に失敗しました。既に登録済みのメールアドレスの可能性があります。')
       }
-      return false
-    }
-    return true
-  }, [email, name, role, companyName, supabase.auth])
-
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    const success = await sendOtp()
-    if (success) {
+    } else {
       setStep('otp')
       startCooldown()
     }
@@ -74,8 +68,15 @@ export default function SignupPage() {
     setLoading(true)
     setError('')
 
-    const success = await sendOtp()
-    if (success) {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+    })
+
+    if (error) {
+      console.error('Resend error:', error.message, error.status)
+      setError('認証コードの再送信に失敗しました。')
+    } else {
       startCooldown()
       setError('')
     }
@@ -157,7 +158,7 @@ export default function SignupPage() {
           )}
 
           {step === 'form' ? (
-            <form onSubmit={handleSendOtp}>
+            <form onSubmit={handleSignup}>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   氏名
@@ -182,6 +183,21 @@ export default function SignupPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="input-field"
                   placeholder="example@email.com"
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  パスワード
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input-field"
+                  placeholder="6文字以上"
+                  minLength={6}
                   required
                 />
               </div>
